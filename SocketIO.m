@@ -590,6 +590,18 @@ static NSString* kSecureXHRPortURL = @"https://%@:%d/socket.io/1/xhr-polling/%@"
 # pragma mark Handshake callbacks (NSURLConnectionDataDelegate)
 - (void) connection:(NSURLConnection *)connection didReceiveResponse:(NSURLResponse *)response 
 {
+    NSHTTPURLResponse* httpResponse = (NSHTTPURLResponse*)response;
+    int statusCode = [httpResponse statusCode];
+    if (statusCode >= 400) {
+        [connection cancel];
+        NSDictionary *errorInfo = [NSDictionary dictionaryWithObject:[NSString stringWithFormat:
+                                              NSLocalizedString(@"Server returned status code %d",@""),
+                                              statusCode]
+                                      forKey:NSLocalizedDescriptionKey];
+        NSError *statusError = [NSError errorWithDomain:@"SocketIOError" code:statusCode userInfo:errorInfo];
+        [self connection:connection didFailWithError:statusError];
+        [self log:statusError.localizedDescription];
+    }
     [_httpRequestData setLength:0];
 }
 
@@ -613,7 +625,7 @@ static NSString* kSecureXHRPortURL = @"https://%@:%d/socket.io/1/xhr-polling/%@"
 - (void) connectionDidFinishLoading:(NSURLConnection *)connection 
 { 	
  	NSString *responseString = [[NSString alloc] initWithData:_httpRequestData encoding:NSASCIIStringEncoding];
-
+    
     [self log:[NSString stringWithFormat:@"requestFinished() %@", responseString]];
     NSArray *data = [responseString componentsSeparatedByString:@":"];
     
